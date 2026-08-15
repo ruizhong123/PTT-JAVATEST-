@@ -9,10 +9,12 @@
 
 2. 於 IDE 終端機或專案根目錄執行以下指令：
 
-'''Bash
-docker-compose up --build
+```bash
+   docker-compose up --build
+```
+
 啟動成功後，打開瀏覽器訪問 http://localhost:5173 即可開始使用。
-'''
+
 
 核心功能與技術實作 (Features & Technical Details)
 免登入瀏覽 (Guest Browsing)
