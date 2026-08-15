@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -17,6 +18,35 @@ public class PostController {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+
+    @GetMapping
+    public ResponseEntity<List<Map<String, Object>>> getAllPosts() {
+        try {
+            String sql = "CALL sp_get_posts()";
+            List<Map<String, Object>> posts = jdbcTemplate.queryForList(sql);
+            
+            // 走訪每一篇文章，把對應的留言查詢出來並放入 comments 欄位
+            for (Map<String, Object> post : posts) {
+                // 取得貼文 ID (相容 id 或 post_id)
+                Object postId = post.get("id");
+                if (postId == null) {
+                    postId = post.get("post_id");
+                }
+                
+                // 查詢該貼文的所有留言
+                String commentSql = "SELECT comment_id AS id, user_id, content, created_at FROM comments WHERE post_id = ? ORDER BY created_at ASC";
+                List<Map<String, Object>> comments = jdbcTemplate.queryForList(commentSql, postId);
+                
+                // 將留言列表加入該貼文的 Map 中，對應前端的 post.comments
+                post.put("comments", comments);
+            }
+            
+            return ResponseEntity.ok(posts);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
+        }
+    }
     // 1. 發文
     @PostMapping
     public ResponseEntity<String> createPost(@RequestBody Map<String, String> request) {
@@ -75,10 +105,28 @@ public class PostController {
         }
     }
 
-    // 4. 針對特定貼文新增留言
-    @PostMapping("/{postId}/comments")
-    public ResponseEntity<String> createComment(@PathVariable int postId, @RequestBody Map<String, String> request) {
-        String commentContent = request.get("content");
-        return ResponseEntity.status(201).body("留言成功");
+// 4. 針對特定貼文新增留言
+@PostMapping("/{postId}/comments")
+public ResponseEntity<String> createComment(@PathVariable int postId, @RequestBody Map<String, String> request) {
+    
+    String userId = request.get("userId"); // 誰留的言
+    String commentContent = request.get("content"); // 留言內容
+
+    if (commentContent == null || commentContent.isEmpty()) {
+        return ResponseEntity.badRequest().body("留言內容不得為空");
     }
+
+    try {
+        // 呼叫預儲程序：傳入貼文 ID、使用者 ID 與留言內容
+        String sql = "CALL sp_create_comment(?, ?, ?)";
+        jdbcTemplate.update(sql, postId, userId, commentContent);
+        
+        // 直接回傳成功，不再依賴受影響行數判斷
+        return ResponseEntity.status(201).body("留言成功");
+
+    } catch (Exception e) {
+        e.printStackTrace(); // 確保未來能印出詳細錯誤
+        return ResponseEntity.status(500).body("系統錯誤，留言失敗：" + e.getMessage());
+    }
+}
 }

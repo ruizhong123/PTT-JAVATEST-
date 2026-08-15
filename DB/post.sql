@@ -32,4 +32,14 @@ BEGIN
     WHERE post_id = p_post_id;
 END //
 
+-- 4. 取得所有貼文
+CREATE PROCEDURE sp_get_posts()
+BEGIN
+    SELECT post_id AS id, user_id, content, created_at 
+    FROM posts 
+    ORDER BY created_at DESC;
+END //
+
+
+
 DELIMITER ;

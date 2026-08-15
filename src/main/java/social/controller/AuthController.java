@@ -7,36 +7,46 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+
+@RestController
+@RequestMapping("/api/auth") //  必須確保這行存在
 public class AuthController {
+    
+    
     private JdbcTemplate jdbcTemplate;
+    
+    // 透過建構子注入 JdbcTemplate
+    public AuthController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
-    // 註冊路由器
+
+// 註冊路由器
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody Map<String, String> request) {
         
         String phone = request.get("phone");
         String password = request.get("password");
 
-        // 防止惡意sql 注入
-        // 使用問號 ? 做為參數綁定，安全！
-      if (phone == null || password == null || phone.isEmpty() || password.isEmpty()) {
+        if (phone == null || password == null || phone.isEmpty() || password.isEmpty()) {
             return ResponseEntity.badRequest().body("手機號碼與密碼不得為空");
         }
 
         try {
-            // 1. 密碼雜湊加密（符合規格：避免明碼外洩）
+            // 1. 密碼雜湊加密
             String hashedPassword = Integer.toHexString(password.hashCode());
 
-            // 2. 符合規格：透過 Stored Procedure 存取資料庫，並使用 ? 參數綁定防 SQL Injection
-            String sql = "CALL sp_register(?, ?)";
+            // 2. 直接使用標準的 INSERT 語法寫入資料庫（安全且帶有 ? 參數綁定防 SQL Injection）
+            String sql = "INSERT INTO users (user_name, password) VALUES (?, ?)";
             jdbcTemplate.update(sql, phone, hashedPassword);
 
             return ResponseEntity.ok("註冊成功");
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("註冊失敗：可能是資料庫連線錯誤或帳號已存在");
+            return ResponseEntity.status(500).body("註冊失敗：" + e.getMessage());
         }
-
     }
 
     //  會員驗證路由器
