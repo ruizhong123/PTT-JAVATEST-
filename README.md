@@ -16,7 +16,7 @@
 啟動成功後，打開瀏覽器訪問 http://localhost:5173 即可開始使用。
 
 
-核心功能與技術實作 (Features & Technical Details)
+## 核心功能與技術實作 (Features & Technical Details)
 免登入瀏覽 (Guest Browsing)
 
 功能描述：訪客進入首頁即可無縫瀏覽最新的熱門文章與留言紀錄。
