@@ -28,3 +28,13 @@ services:
       - SPRING_DATASOURCE_PASSWORD=rootpassword
     depends_on:
       - db
+
+  frontend:
+    build:
+      context: ./front  # 請對應你的前端資料夾名稱
+      dockerfile: Dockerfile
+    container_name: social_frontend_app
+    ports:
+      - "5173:80"  # 評審只要打開 http://localhost:5173 就能看到網頁
+    depends_on:
+      - backend

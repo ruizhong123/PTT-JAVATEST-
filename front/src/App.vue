@@ -17,6 +17,8 @@ interface Post {
   created_at: string;
   comments: Comment[];
   newCommentContent?: string;
+  isEditing?: boolean;    // 新增：控制是否處於編輯狀態
+  editContent?: string;   // 新增：暫存編輯中的內容
 }
 
 const posts = ref<Post[]>([]);
@@ -37,9 +39,6 @@ const fetchPosts = async () => {
     posts.value = response.data;
   } catch (error) {
     console.error('取得貼文失敗', error);
-    posts.value = [
-      { id: 1, user_id: '0912345678', content: '大家覺得今天的 Spring Boot 好用嗎？', created_at: '2026-06-07 10:00', comments: [{ id: 1, user_id: '0987654321', content: '超讚的！', created_at: '2026-06-07 10:05' }] }
-    ];
   }
 };
 
@@ -104,6 +103,45 @@ const createPost = async () => {
   }
 };
 
+// 3. 刪除貼文 (對應後端 DELETE /api/posts/{id})
+const deletePost = async (postId: number) => {
+  if (!confirm('確定要刪除這篇貼文嗎？')) return;
+  try {
+    await axios.delete(`/api/posts/${postId}`);
+    fetchPosts();
+  } catch (error) {
+    alert('刪除失敗');
+  }
+};
+
+// 4. 開始編輯貼文
+const startEdit = (post: Post) => {
+  post.isEditing = true;
+  post.editContent = post.content;
+};
+
+// 取消編輯
+const cancelEdit = (post: Post) => {
+  post.isEditing = false;
+  post.editContent = '';
+};
+
+// 5. 儲存更新貼文 (對應後端 PUT /api/posts/{id})
+const updatePost = async (postId: number, newContent?: string) => {
+  if (!newContent || !newContent.trim()) {
+    alert('內容不得為空');
+    return;
+  }
+  try {
+    await axios.put(`/api/posts/${postId}`, {
+      content: newContent
+    });
+    fetchPosts();
+  } catch (error) {
+    alert('更新失敗');
+  }
+};
+
 const createComment = async (postId: number, commentContent?: string) => {
   if (!commentContent || !commentContent.trim()) return;
 
@@ -138,7 +176,6 @@ const createComment = async (postId: number, commentContent?: string) => {
         <input type="password" v-model="loginPassword" placeholder="請輸入密碼" />
       </div>
       
-      <!-- 拆分獨立的「註冊」與「登入」按鈕 -->
       <div class="button-group" style="display: flex; gap: 10px;">
         <button @click="handleRegister" class="btn-secondary" style="flex: 1;">註冊帳號</button>
         <button @click="handleLogin" class="btn-primary" style="flex: 1;">會員登入</button>
@@ -159,13 +196,32 @@ const createComment = async (postId: number, commentContent?: string) => {
     <main class="posts-list">
       <h2>📌 熱門文章列表</h2>
       <div v-for="post in posts" :key="post.id" class="post-item">
-        <div class="post-meta">
-          <span class="post-author">作者: {{ post.user_id }}</span>
-          <span class="post-time">{{ post.created_at }}</span>
-        </div>
-        <div class="post-content">{{ post.content }}</div>
+        <div class="post-header-row" style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="post-meta">
+            <span class="post-author">作者: {{ post.user_id }}</span>
+            <span class="post-time" style="margin-left: 10px;">{{ post.created_at }}</span>
+          </div>
 
-        <div class="comments-section">
+          <!-- 權限控制：只有已登入且為該貼文作者時，才顯示編輯與刪除按鈕 -->
+          <div v-if="isLoggedIn && currentPhone === post.user_id" class="post-owner-actions">
+            <template v-if="!post.isEditing">
+              <button @click="startEdit(post)" class="btn-sm" style="margin-right: 5px;">編輯</button>
+              <button @click="deletePost(post.id)" class="btn-sm" style="background-color: #ff4d4f; color: white;">刪除</button>
+            </template>
+          </div>
+        </div>
+
+        <!-- 貼文內容區塊：若點擊編輯則切換為輸入框 -->
+        <div v-if="post.isEditing" class="edit-section" style="margin-top: 10px;">
+          <textarea v-model="post.editContent" style="width: 100%; min-height: 60px;"></textarea>
+          <div style="display: flex; gap: 5px; margin-top: 5px;">
+            <button @click="updatePost(post.id, post.editContent)" class="btn-sm btn-success">儲存</button>
+            <button @click="cancelEdit(post)" class="btn-sm">取消</button>
+          </div>
+        </div>
+        <div v-else class="post-content" style="margin-top: 8px;">{{ post.content }}</div>
+
+        <div class="comments-section" style="margin-top: 15px;">
           <h4>💬 留言列表</h4>
           <div v-for="comment in post.comments" :key="comment.id" class="comment-item">
             <span class="comment-author">{{ comment.user_id }}:</span>
@@ -173,7 +229,7 @@ const createComment = async (postId: number, commentContent?: string) => {
             <span class="comment-time">({{ comment.created_at }})</span>
           </div>
 
-          <div v-if="isLoggedIn" class="comment-input-box">
+          <div v-if="isLoggedIn" class="comment-input-box" style="margin-top: 8px;">
             <input v-model="post.newCommentContent" placeholder="寫下你的回應..." />
             <button @click="createComment(post.id, post.newCommentContent)" class="btn-sm">留言</button>
           </div>
